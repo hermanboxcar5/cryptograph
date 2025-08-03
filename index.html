@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Multi-Step Decryptor</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2rem; background: #f0f0f0; }
+    #pipeline { display: flex; flex-direction: column; gap: 1rem; }
+    .block { background: white; padding: 1rem 1rem 1rem 2.5rem; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); cursor: move; position: relative; }
+    .block select, .block input { margin-top: 0.5rem; width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 5px; }
+    .block-output { margin-top: 0.5rem; padding: 0.5rem; background: #e9ecef; border-radius: 5px; font-family: monospace; white-space: pre-wrap; word-wrap: break-word; }
+    .remove-btn { position: absolute; top: 10px; right: 10px; background: #dc3545; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-weight: bold; }
+    .block-number { position: absolute; top: 10px; left: 10px; font-weight: bold; background: #007bff; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; z-index: 1; }
+    .brute-force-shifts { display: flex; flex-direction: column; gap: 0.2rem; margin-top: 0.5rem; }
+    .brute-force-shift { cursor: pointer; background: #f8f9fa; padding: 0.25rem 0.5rem; border-radius: 5px; }
+    .brute-force-shift.selected { background: #007bff; color: white; }
+  </style>
+</head>
+<body>
+  <h1>Multi-Step Decryptor</h1>
+  <textarea id="inputText" placeholder="Enter encrypted text here" rows="4" style="width:100%;"></textarea>
+
+  <div id="pipeline"></div>
+
+  <div class="buttons">
+    <button onclick="addBlock('convert')">Add Conversion Block</button>
+    <button onclick="addBlock('cipher')">Add Cipher Block</button>
+  </div>
+
+  <h2>Final Output</h2>
+  <div id="output"></div>
+
+  <script>
+    const inputFormats = {
+      'base64': { label: 'Base64', process: input => atob(input) },
+      'base16': { label: 'Base16', process: input => input.match(/.{1,2}/g).map(byte => String.fromCharCode(parseInt(byte, 16))).join('') },
+      'binary': { label: 'Binary', process: input => input.split(' ').map(b => String.fromCharCode(parseInt(b, 2))).join('') },
+      'hex': { label: 'Hex', process: input => input.match(/.{1,2}/g).map(h => String.fromCharCode(parseInt(h, 16))).join('') },
+      'ascii': { label: 'ASCII', process: input => input },
+      'utf8': { label: 'UTF-8', process: input => decodeURIComponent(escape(input)) }
+    };
+
+    const outputFormats = {
+      'utf8': { label: 'UTF-8', process: input => decodeURIComponent(escape(input)) },
+      'ascii': { label: 'ASCII', process: input => input },
+      'base64': { label: 'Base64', process: input => btoa(input) },
+      'base16': { label: 'Base16', process: input => [...input].map(c => c.charCodeAt(0).toString(16).padStart(2, '0')).join('') },
+      'binary': { label: 'Binary', process: input => [...input].map(c => c.charCodeAt(0).toString(2).padStart(8, '0')).join(' ') }
+    };
+
+    function caesar(text, shift, mode = 'decrypt') {
+      if (mode === 'encrypt') shift = -shift;
+      return text.replace(/[a-z]/gi, c => {
+        let base = c >= 'a' && c <= 'z' ? 97 : 65;
+        return String.fromCharCode((c.charCodeAt(0) - base + shift + 26) % 26 + base);
+      });
+    }
+
+    function vigenere(text, key, mode = 'decrypt') {
+      let result = '', j = 0;
+      for (let i = 0; i < text.length; i++) {
+        let c = text[i];
+        if (/[a-z]/i.test(c)) {
+          let shift = key.charCodeAt(j % key.length) - 97;
+          if (mode === 'encrypt') shift = -shift;
+          let base = c >= 'a' && c <= 'z' ? 97 : 65;
+          result += String.fromCharCode((c.charCodeAt(0) - base + shift + 26) % 26 + base);
+          j++;
+        } else {
+          result += c;
+        }
+      }
+      return result;
+    }
+
+    document.getElementById('inputText').addEventListener('input', runPipeline);
+
+    function addBlock(type = 'convert') {
+      const container = document.createElement('div');
+      container.className = 'block';
+      container.draggable = true;
+
+      let innerHTML = `<div class="block-number"></div><button class="remove-btn" onclick="this.parentElement.remove(); runPipeline(); updateBlockNumbers();">&times;</button>`;
+
+      if (type === 'convert') {
+        const blocks = document.querySelectorAll('#pipeline .block');
+        let defaultInput = 'base64';
+        if (blocks.length > 0) {
+          const last = blocks[blocks.length - 1];
+          const lastOutput = last.querySelector('.output-type');
+          if (lastOutput) defaultInput = lastOutput.value;
+        }
+
+        innerHTML += `
+          <label>Input As</label>
+          <select class="input-type">
+            ${Object.keys(inputFormats).map(k => `<option value="${k}" ${k === defaultInput ? 'selected' : ''}>${inputFormats[k].label}</option>`).join('')}
+          </select>
+          <label>Output As</label>
+          <select class="output-type">
+            ${Object.keys(outputFormats).map(k => `<option value="${k}">${outputFormats[k].label}</option>`).join('')}
+          </select>
+        `;
+      } else if (type === 'cipher') {
+        innerHTML += `
+          <label>Cipher</label>
+          <select class="cipher-type">
+            <option value="caesar">Caesar</option>
+            <option value="vigenere">Vigenère</option>
+          </select>
+          <label>Mode</label>
+          <select class="cipher-mode">
+            <option value="decrypt">Decrypt</option>
+            <option value="encrypt">Encrypt</option>
+            <option value="bruteForce">Brute Force</option>
+          </select>
+          <input type="text" class="cipher-key" placeholder="Enter shift/key" />
+          <div class="brute-force-shifts"></div>
+        `;
+      }
+
+      innerHTML += `<div class="block-output"></div>`;
+      container.innerHTML = innerHTML;
+
+      container.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('text/plain', null);
+        container.classList.add('dragging');
+      });
+      container.addEventListener('dragend', () => {
+        container.classList.remove('dragging');
+        updateBlockNumbers();
+        runPipeline();
+      });
+      container.addEventListener('dragover', e => e.preventDefault());
+      container.addEventListener('drop', e => {
+        e.preventDefault();
+        const dragging = document.querySelector('.dragging');
+        if (dragging && dragging !== container) {
+          pipeline.insertBefore(dragging, container);
+          updateBlockNumbers();
+          runPipeline();
+        }
+      });
+
+      container.querySelectorAll('select, input').forEach(el => {
+        el.addEventListener('input', runPipeline);
+        el.addEventListener('change', runPipeline);
+      });
+
+      document.getElementById('pipeline').appendChild(container);
+      updateBlockNumbers();
+      runPipeline();
+    }
+
+    function updateBlockNumbers() {
+      document.querySelectorAll('#pipeline .block').forEach((block, index) => {
+        block.querySelector('.block-number').textContent = index + 1;
+      });
+    }
+
+    function runPipeline() {
+      let current = document.getElementById('inputText').value;
+      const blocks = document.querySelectorAll('#pipeline .block');
+      let hasError = false;
+
+      blocks.forEach((block, index) => {
+        const outputEl = block.querySelector('.block-output');
+        const bfContainer = block.querySelector('.brute-force-shifts');
+        block.dataset.output = '';
+
+        if (hasError) {
+          outputEl.textContent = '[Skipped due to previous error]';
+          return;
+        }
+
+        try {
+          if (block.querySelector('.input-type')) {
+            const inputType = block.querySelector('.input-type').value;
+            const outputType = block.querySelector('.output-type').value;
+            current = inputFormats[inputType].process(current);
+            current = outputFormats[outputType].process(current);
+          } else {
+            const cipher = block.querySelector('.cipher-type').value;
+            const mode = block.querySelector('.cipher-mode').value;
+            const key = block.querySelector('.cipher-key').value;
+
+            if (cipher === 'caesar') {
+              if (mode === 'bruteForce') {
+                bfContainer.innerHTML = '';
+                let selectedShift = block.dataset.selectedShift ? parseInt(block.dataset.selectedShift) : 0;
+                for (let shift = 0; shift < 26; shift++) {
+                  const out = caesar(current, shift, 'decrypt');
+                  const span = document.createElement('span');
+                  span.textContent = `Shift ${shift}: ${out.substring(0, 30)}`;
+                  span.className = 'brute-force-shift';
+                  if (shift === selectedShift) {
+                    span.classList.add('selected');
+                    outputEl.textContent = out;
+                    current = out;
+                  }
+                  span.onclick = () => {
+                    block.dataset.selectedShift = shift;
+                    runPipeline();
+                  };
+                  bfContainer.appendChild(span);
+                }
+                if (!block.dataset.selectedShift) outputEl.textContent = 'Select a shift below';
+              } else {
+                current = caesar(current, parseInt(key), mode);
+              }
+            } else if (cipher === 'vigenere') {
+              current = vigenere(current, key, mode);
+            }
+          }
+
+          if (!block.querySelector('.cipher-mode') || block.querySelector('.cipher-mode').value !== 'bruteForce') {
+            outputEl.textContent = current;
+          }
+
+          block.dataset.output = current;
+        } catch (e) {
+          current = `[Error: ${e.message}]`;
+          hasError = true;
+          outputEl.textContent = current;
+        }
+      });
+
+      document.getElementById('output').textContent = current;
+    }
+  </script>
+</body>
+</html>
