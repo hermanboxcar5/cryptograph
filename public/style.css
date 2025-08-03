@@ -1,0 +1,129 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Quicksand:wght@300..700&display=swap');
+
+
+body {
+    font-family: "Inter", sans-serif;
+    margin: 2rem;
+    background: #2e2e2e;
+    color:white
+}
+
+#pipeline {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.block {
+    background: #111111;
+    padding: 1rem 1rem 1rem 2.5rem;
+    border-radius: 15px;
+    cursor: move;
+    position: relative;
+}
+
+.block select,
+.block input {
+    margin-top: 0.5rem;
+    padding: 20px;
+    color:white;
+    background:#313131;
+    border-radius: 15px;
+}
+
+.block input {
+    width: calc(100% - 40px);
+    border:none;
+}
+.block select {
+    width: 100%;
+    max-width:100%;
+}
+
+.block-output {
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    background: #3a3a3a;
+    color:azure;
+    border-radius: 5px;
+    font-family: monospace;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.remove-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.block-number {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    font-weight: bold;
+    background: #007bff8c;
+    color: white;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+}
+
+.brute-force-shifts {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    margin-top: 0.5rem;
+}
+
+.brute-force-shift {
+    cursor: pointer;
+    background: #303030;
+    padding: 0.25rem 0.5rem;
+    border-radius: 5px;
+    color:white;
+}
+
+.brute-force-shift.selected {
+    background: #007bff67;
+    color: white;
+}
+
+button {
+    width: max-content;
+    height: 50px;
+    padding: 0 20px; /* only left/right padding */
+    border-radius: 20px;
+    display: flex;
+    align-items: center;  /* vertical centering */
+    justify-content: center; /* horizontal centering */
+    background-color:#494949;
+    color:white;
+    border:none;
+
+}
+
+.buttons {
+  display: flex;
+  gap: 10px; /* Optional: spacing between buttons */
+}
+
+textarea {
+    background-color:#494949;
+    border:none;
+    border-radius:15px;
+    padding:15px;
+    color:white;
+}

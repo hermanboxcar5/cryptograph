@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Cryptograph</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>Cryptograph</h1>
+  <textarea id="inputText" placeholder="Enter encrypted text here" rows="4" style="width:100%;"></textarea>
+
+  <div id="pipeline"></div>
+
+  <div class="buttons">
+    <button onclick="addBlock('convert')">Add Conversion Block</button>
+    <button onclick="addBlock('cipher')">Add Cipher Block</button>
+  </div>
+
+  <h2>Final Output</h2>
+  <div id="output"></div>
+
+  <script src="script.js"></script>
+</body>
+</html>

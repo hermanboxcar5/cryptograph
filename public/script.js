@@ -1,37 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Multi-Step Decryptor</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 2rem; background: #f0f0f0; }
-    #pipeline { display: flex; flex-direction: column; gap: 1rem; }
-    .block { background: white; padding: 1rem 1rem 1rem 2.5rem; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); cursor: move; position: relative; }
-    .block select, .block input { margin-top: 0.5rem; width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 5px; }
-    .block-output { margin-top: 0.5rem; padding: 0.5rem; background: #e9ecef; border-radius: 5px; font-family: monospace; white-space: pre-wrap; word-wrap: break-word; }
-    .remove-btn { position: absolute; top: 10px; right: 10px; background: #dc3545; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-weight: bold; }
-    .block-number { position: absolute; top: 10px; left: 10px; font-weight: bold; background: #007bff; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; z-index: 1; }
-    .brute-force-shifts { display: flex; flex-direction: column; gap: 0.2rem; margin-top: 0.5rem; }
-    .brute-force-shift { cursor: pointer; background: #f8f9fa; padding: 0.25rem 0.5rem; border-radius: 5px; }
-    .brute-force-shift.selected { background: #007bff; color: white; }
-  </style>
-</head>
-<body>
-  <h1>Multi-Step Decryptor</h1>
-  <textarea id="inputText" placeholder="Enter encrypted text here" rows="4" style="width:100%;"></textarea>
-
-  <div id="pipeline"></div>
-
-  <div class="buttons">
-    <button onclick="addBlock('convert')">Add Conversion Block</button>
-    <button onclick="addBlock('cipher')">Add Cipher Block</button>
-  </div>
-
-  <h2>Final Output</h2>
-  <div id="output"></div>
-
-  <script>
-    const inputFormats = {
+const inputFormats = {
       'base64': { label: 'Base64', process: input => atob(input) },
       'base16': { label: 'Base16', process: input => input.match(/.{1,2}/g).map(byte => String.fromCharCode(parseInt(byte, 16))).join('') },
       'binary': { label: 'Binary', process: input => input.split(' ').map(b => String.fromCharCode(parseInt(b, 2))).join('') },
@@ -84,7 +51,7 @@
 
       if (type === 'convert') {
         const blocks = document.querySelectorAll('#pipeline .block');
-        let defaultInput = 'base64';
+        let defaultInput = 'utf8';
         if (blocks.length > 0) {
           const last = blocks[blocks.length - 1];
           const lastOutput = last.querySelector('.output-type');
@@ -157,76 +124,75 @@
         block.querySelector('.block-number').textContent = index + 1;
       });
     }
+function runPipeline() {
+  let current = document.getElementById('inputText').value;
+  const blocks = document.querySelectorAll('#pipeline .block');
+  let hasError = false;
 
-    function runPipeline() {
-      let current = document.getElementById('inputText').value;
-      const blocks = document.querySelectorAll('#pipeline .block');
-      let hasError = false;
+  blocks.forEach((block, index) => {
+    const outputEl = block.querySelector('.block-output');
+    const bfContainer = block.querySelector('.brute-force-shifts');
+    block.dataset.output = '';
 
-      blocks.forEach((block, index) => {
-        const outputEl = block.querySelector('.block-output');
-        const bfContainer = block.querySelector('.brute-force-shifts');
-        block.dataset.output = '';
+    if (hasError) {
+      outputEl.textContent = '[Skipped due to previous error]';
+      return;
+    }
 
-        if (hasError) {
-          outputEl.textContent = '[Skipped due to previous error]';
-          return;
-        }
+    try {
+      const inputAtThisBlock = current;
 
-        try {
-          if (block.querySelector('.input-type')) {
-            const inputType = block.querySelector('.input-type').value;
-            const outputType = block.querySelector('.output-type').value;
-            current = inputFormats[inputType].process(current);
-            current = outputFormats[outputType].process(current);
-          } else {
-            const cipher = block.querySelector('.cipher-type').value;
-            const mode = block.querySelector('.cipher-mode').value;
-            const key = block.querySelector('.cipher-key').value;
+      if (block.querySelector('.input-type')) {
+        const inputType = block.querySelector('.input-type').value;
+        const outputType = block.querySelector('.output-type').value;
+        current = inputFormats[inputType].process(current);
+        current = outputFormats[outputType].process(current);
+        outputEl.textContent = current;
+      } else {
+        const cipher = block.querySelector('.cipher-type').value;
+        const mode = block.querySelector('.cipher-mode').value;
+        const key = block.querySelector('.cipher-key').value;
 
-            if (cipher === 'caesar') {
-              if (mode === 'bruteForce') {
-                bfContainer.innerHTML = '';
-                let selectedShift = block.dataset.selectedShift ? parseInt(block.dataset.selectedShift) : 0;
-                for (let shift = 0; shift < 26; shift++) {
-                  const out = caesar(current, shift, 'decrypt');
-                  const span = document.createElement('span');
-                  span.textContent = `Shift ${shift}: ${out.substring(0, 30)}`;
-                  span.className = 'brute-force-shift';
-                  if (shift === selectedShift) {
-                    span.classList.add('selected');
-                    outputEl.textContent = out;
-                    current = out;
-                  }
-                  span.onclick = () => {
-                    block.dataset.selectedShift = shift;
-                    runPipeline();
-                  };
-                  bfContainer.appendChild(span);
-                }
-                if (!block.dataset.selectedShift) outputEl.textContent = 'Select a shift below';
-              } else {
-                current = caesar(current, parseInt(key), mode);
+        if (cipher === 'caesar') {
+          if (mode === 'bruteForce') {
+            bfContainer.innerHTML = '';
+            let selectedShift = block.dataset.selectedShift ? parseInt(block.dataset.selectedShift) : 0;
+
+            for (let shift = 0; shift < 26; shift++) {
+              const out = caesar(inputAtThisBlock, shift, 'decrypt');
+              const span = document.createElement('span');
+              span.textContent = `Shift ${shift}: ${out.substring(0, 30)}`;
+              span.className = 'brute-force-shift';
+              if (shift === selectedShift) {
+                span.classList.add('selected');
               }
-            } else if (cipher === 'vigenere') {
-              current = vigenere(current, key, mode);
+              span.onclick = () => {
+                block.dataset.selectedShift = shift;
+                runPipeline(); // rerun with new selection
+              };
+              bfContainer.appendChild(span);
             }
-          }
 
-          if (!block.querySelector('.cipher-mode') || block.querySelector('.cipher-mode').value !== 'bruteForce') {
+            current = caesar(inputAtThisBlock, selectedShift, 'decrypt');
+            outputEl.textContent = current;
+
+          } else {
+            current = caesar(current, parseInt(key), mode);
             outputEl.textContent = current;
           }
-
-          block.dataset.output = current;
-        } catch (e) {
-          current = `[Error: ${e.message}]`;
-          hasError = true;
+        } else if (cipher === 'vigenere') {
+          current = vigenere(current, key, mode);
           outputEl.textContent = current;
         }
-      });
+      }
 
-      document.getElementById('output').textContent = current;
+      block.dataset.output = current;
+    } catch (e) {
+      current = `[Error: ${e.message}]`;
+      hasError = true;
+      outputEl.textContent = current;
     }
-  </script>
-</body>
-</html>
+  });
+
+  document.getElementById('output').textContent = current;
+}
